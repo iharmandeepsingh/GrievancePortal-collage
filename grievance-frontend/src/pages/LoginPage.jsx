@@ -1,0 +1,155 @@
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import "../styles/LoginPage.css";
+
+function LoginPage() {
+  const [role, setRole] = useState("");
+  const [userId, setUserId] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [message, setMessage] = useState("");
+  const [color, setColor] = useState("red");
+
+  const navigate = useNavigate();
+
+  // Step 1: Send OTP
+  const handleSendOTP = async (e) => {
+    e.preventDefault();
+    setMessage("📨 Sending OTP...");
+
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/request-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role, id: userId, phone }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to send OTP");
+
+      setOtpSent(true);
+      setMessage("✅ OTP sent successfully! Now enter your OTP to login.");
+      setColor("green");
+    } catch (err) {
+      setMessage(`❌ ${err.message}`);
+      setColor("red");
+    }
+  };
+
+  // Step 2: Verify OTP + Password
+  const handleVerifyOTPAndPassword = async (e) => {
+    e.preventDefault();
+    setMessage("🔍 Verifying credentials...");
+
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/verify-otp-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: userId, otp, password, role }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Invalid OTP or Password");
+
+      setMessage("✅ Login successful!");
+      setColor("green");
+
+      localStorage.setItem("grievance_role", data.role);
+      localStorage.setItem("grievance_id", data.id);
+      localStorage.setItem("grievance_token", data.token);
+
+      setTimeout(() => {
+        if (data.role === "student") navigate("/student/dashboard");
+        else if (data.role === "staff") navigate("/staff/dashboard");
+        else navigate("/admin/dashboard");
+      }, 1000);
+    } catch (err) {
+      setMessage(`❌ ${err.message}`);
+      setColor("red");
+    }
+  };
+
+  return (
+    <main className="center">
+      <div className="card">
+        <h1>Secure Login Portal</h1>
+        <p className="subtitle">Login using ID, Password, and OTP Verification</p>
+
+        {!otpSent ? (
+          <form className="form" onSubmit={handleSendOTP}>
+            <label className="field">
+              <span>Select Role</span>
+              <select value={role} onChange={(e) => setRole(e.target.value)} required>
+                <option value="">Select Role</option>
+                <option value="student">Student</option>
+                <option value="staff">Staff</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
+
+            <label className="field">
+              <span>ID</span>
+              <input
+                type="text"
+                placeholder="e.g. STU001"
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Password</span>
+              <input
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Phone</span>
+              <input
+                type="tel"
+                placeholder="9876543210"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                pattern="[0-9]{10}"
+                required
+              />
+            </label>
+
+            <button className="btn" type="submit">Send OTP</button>
+          </form>
+        ) : (
+          <form className="form" onSubmit={handleVerifyOTPAndPassword}>
+            <label className="field">
+              <span>Enter OTP</span>
+              <input
+                type="text"
+                placeholder="123456"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                required
+              />
+            </label>
+
+            <button className="btn" type="submit">Verify & Login</button>
+          </form>
+        )}
+
+        <p className="msg" style={{ color }}>{message}</p>
+
+        <p className="note">
+          Don’t have an account? <a href="/register">Register here</a>
+        </p>
+      </div>
+    </main>
+  );
+}
+
+export default LoginPage;
