@@ -96,17 +96,26 @@ textarea {
 }
 
 /* ============ NAVBAR ============ */
+/* ============ NAVBAR ============ */
 .navbar {
   background-color: #007cf8;
-  padding: 10px 0;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-  margin-bottom: 20px;
+  padding: 12px 0;
+  margin: 0 auto 25px auto;      /* centers navbar horizontally */
+  width: 90%;                    /* ✅ adds left & right space */
+  max-width: 1200px;             /* prevents it from being too wide */
+  border-radius: 10px;           /* smooth rounded edges */
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+  position: sticky;
+  top: 10px;                     /* adds small gap from top */
+  z-index: 1000;
 }
 
+/* Centered content inside navbar */
 .navbar ul {
   list-style: none;
   display: flex;
   justify-content: center;
+  align-items: center;
   gap: 40px;
   margin: 0;
   padding: 0;
@@ -114,22 +123,87 @@ textarea {
 }
 
 .navbar li {
-  color: white;
-  cursor: pointer;
   font-weight: 700;
-  transition: 0.3s;
-  padding: 8px 14px;
+  padding: 8px 16px;
   border-radius: 6px;
-  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.navbar li a {
+  color: white;
+  text-decoration: none;
+  font-weight: 600;
 }
 
 .navbar li:hover {
-  background-color: rgba(38, 172, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.25);
 }
 
-.navbar .active {
-  background-color: #2389f0;
+.navbar .active a {
+  background-color: #005dc9;
+  border-radius: 6px;
+  padding: 8px 16px;
   color: #fff;
+}
+
+/* Make navbar responsive */
+@media (max-width: 768px) {
+  .navbar {
+    width: 95%;
+    top: 5px;
+    border-radius: 8px;
+  }
+
+  .navbar ul {
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 0;
+  }
+
+  .navbar li {
+    width: 80%;
+    text-align: center;
+  }
+}
+
+
+/* ============ GRIEVANCE TABLE ============ */
+.grievance-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+.grievance-table th,
+.grievance-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+
+.grievance-table th {
+  background-color: #f4f4f4;
+  text-align: left;
+}
+
+.resolve-btn {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.resolve-btn:hover {
+  background-color: #0056b3;
+}
+
+.resolved-btn {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
 }
 
 /* ============ RESPONSIVE DESIGN ============ */

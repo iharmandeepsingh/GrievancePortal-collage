@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import "../styles/LoginPage.css";
 
 function LoginPage() {
-  const [role, setRole] = useState("");
   const [userId, setUserId] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -14,23 +13,43 @@ function LoginPage() {
 
   const navigate = useNavigate();
 
-  // Step 1: Send OTP
+  // ✅ Detect user role from ID prefix
+  const detectRoleFromId = (id) => {
+    const upperId = id.toUpperCase();
+    if (upperId.startsWith("STU")) return "student";
+    if (upperId.startsWith("STF")) return "staff";
+    if (upperId.startsWith("ADM")) return "admin";
+    return null;
+  };
+
+  // ✅ Step 1: Send OTP
   const handleSendOTP = async (e) => {
     e.preventDefault();
     setMessage("📨 Sending OTP...");
+
+    const detectedRole = detectRoleFromId(userId);
+    if (!detectedRole) {
+      setMessage("❌ Invalid ID format — must start with STU / STF / ADM");
+      setColor("red");
+      return;
+    }
 
     try {
       const res = await fetch("http://localhost:5000/api/auth/request-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, id: userId, phone }),
+        body: JSON.stringify({
+          role: detectedRole,
+          id: userId.toUpperCase(),
+          phone,
+        }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to send OTP");
 
       setOtpSent(true);
-      setMessage("✅ OTP sent successfully! Now enter your OTP to login.");
+      setMessage("✅ OTP sent successfully! Enter OTP to verify.");
       setColor("green");
     } catch (err) {
       setMessage(`❌ ${err.message}`);
@@ -38,32 +57,60 @@ function LoginPage() {
     }
   };
 
-  // Step 2: Verify OTP + Password
+  // ✅ Step 2: Verify OTP + Password
   const handleVerifyOTPAndPassword = async (e) => {
     e.preventDefault();
     setMessage("🔍 Verifying credentials...");
+
+    const detectedRole = detectRoleFromId(userId);
+    if (!detectedRole) {
+      setMessage("❌ Invalid ID format — must start with STU / STF / ADM");
+      setColor("red");
+      return;
+    }
 
     try {
       const res = await fetch("http://localhost:5000/api/auth/verify-otp-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: userId, otp, password, role }),
+        body: JSON.stringify({
+          id: userId.toUpperCase(),
+          otp,
+          password,
+          role: detectedRole,
+        }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Invalid OTP or Password");
 
+      // ✅ Normalize before saving
+      const normalizedId = data.id.toUpperCase();
+      const normalizedRole = data.role.toLowerCase();
+
+      localStorage.setItem("grievance_id", normalizedId);
+      localStorage.setItem("grievance_role", normalizedRole);
+      localStorage.setItem("grievance_token", data.token);
+
       setMessage("✅ Login successful!");
       setColor("green");
 
-      localStorage.setItem("grievance_role", data.role);
-      localStorage.setItem("grievance_id", data.id);
-      localStorage.setItem("grievance_token", data.token);
-
+      // ✅ Redirect based on ID and role
       setTimeout(() => {
-        if (data.role === "student") navigate("/student/dashboard");
-        else if (data.role === "staff") navigate("/staff/dashboard");
-        else navigate("/admin/dashboard");
+        if (normalizedRole === "student") {
+          navigate("/student/dashboard");
+        } else if (normalizedRole === "staff") {
+          navigate("/staff/dashboard");
+        } else if (normalizedRole === "admin") {
+          const adminRoutes = {
+            ADM01: "/admin/dashboard",
+            ADM_ACCOUNT: "/admin/account",
+            ADM_WELFARE: "/admin/studentwelfare",
+            ADM_ADMISSION: "/admin/admission",
+            ADM_EXAM: "/admin/examination",
+          };
+          navigate(adminRoutes[normalizedId] || "/admin/dashboard");
+        }
       }, 1000);
     } catch (err) {
       setMessage(`❌ ${err.message}`);
@@ -75,27 +122,20 @@ function LoginPage() {
     <main className="center">
       <div className="card">
         <h1>Secure Login Portal</h1>
-        <p className="subtitle">Login using ID, Password, and OTP Verification</p>
+        <p className="subtitle">
+          Login using ID (STU/STF/ADM), Password, and OTP Verification
+        </p>
 
+        {/* Step 1: Request OTP */}
         {!otpSent ? (
           <form className="form" onSubmit={handleSendOTP}>
-            <label className="field">
-              <span>Select Role</span>
-              <select value={role} onChange={(e) => setRole(e.target.value)} required>
-                <option value="">Select Role</option>
-                <option value="student">Student</option>
-                <option value="staff">Staff</option>
-                <option value="admin">Admin</option>
-              </select>
-            </label>
-
             <label className="field">
               <span>ID</span>
               <input
                 type="text"
-                placeholder="e.g. STU001"
+                placeholder="e.g. STU001 or ADM_ACCOUNT"
                 value={userId}
-                onChange={(e) => setUserId(e.target.value)}
+                onChange={(e) => setUserId(e.target.value.toUpperCase())}
                 required
               />
             </label>
@@ -126,6 +166,7 @@ function LoginPage() {
             <button className="btn" type="submit">Send OTP</button>
           </form>
         ) : (
+          // Step 2: Verify OTP + Password
           <form className="form" onSubmit={handleVerifyOTPAndPassword}>
             <label className="field">
               <span>Enter OTP</span>
