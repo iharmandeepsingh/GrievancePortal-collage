@@ -1,7 +1,19 @@
-// src/pages/StudentWelfareAdminDashboard.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/Dashboard.css";
+
+// Helper function to format dates
+const formatDate = (dateString) => {
+  if (!dateString) return "N/A";
+  const options = {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  };
+  return new Date(dateString).toLocaleDateString("en-US", options);
+};
 
 function StudentWelfareAdminDashboard() {
   const navigate = useNavigate();
@@ -9,9 +21,10 @@ function StudentWelfareAdminDashboard() {
   const userId = localStorage.getItem("grievance_id")?.toUpperCase();
 
   const [grievances, setGrievances] = useState([]);
-  const [message, setMessage] = useState("");
+  const [msg, setMsg] = useState("");
+  const [statusType, setStatusType] = useState(""); // "success" or "error"
 
-  // ✅ Protect route - only accessible to ADM_WELFARE
+  // Protect route
   useEffect(() => {
     if (!role || role !== "admin" || userId !== "ADM_WELFARE") {
       navigate("/");
@@ -20,22 +33,26 @@ function StudentWelfareAdminDashboard() {
     }
   }, [role, userId, navigate]);
 
-  // ✅ Fetch grievances related to Student Welfare
+  // Fetch grievances
   const fetchGrievances = async () => {
     try {
       const res = await fetch(
         "http://localhost:5000/api/grievances/department/Student Welfare"
       );
+      if (!res.ok) throw new Error("Failed to fetch data");
       const data = await res.json();
       setGrievances(data);
     } catch (error) {
-      console.error("❌ Error fetching grievances:", error);
-      setMessage("Failed to load grievances");
+      console.error("Error fetching grievances:", error);
+      setMsg("Failed to load grievances");
+      setStatusType("error");
     }
   };
 
-  // ✅ Update grievance status
+  // Update grievance status
   const updateStatus = async (id, newStatus) => {
+    setMsg("Updating status...");
+    setStatusType("info");
     try {
       const res = await fetch(`http://localhost:5000/api/grievances/${id}`, {
         method: "PUT",
@@ -47,15 +64,18 @@ function StudentWelfareAdminDashboard() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
-      setMessage("✅ Status updated successfully!");
-      fetchGrievances();
+      
+      setMsg("Status updated successfully!");
+      setStatusType("success");
+      fetchGrievances(); // Refresh the list
     } catch (err) {
-      console.error("❌ Error updating grievance:", err);
-      setMessage("❌ Failed to update grievance status");
+      console.error("Error updating grievance:", err);
+      setMsg(`Error: ${err.message}`);
+      setStatusType("error");
     }
   };
 
-  // ✅ Logout
+  // Logout
   const handleLogout = () => {
     localStorage.clear();
     navigate("/");
@@ -64,64 +84,79 @@ function StudentWelfareAdminDashboard() {
   return (
     <div className="dashboard-container">
       <header className="dashboard-header">
-        <h1>🎓 Student Welfare Department Admin</h1>
+        <h1>Student Welfare Department</h1>
         <p>Welcome, {userId}</p>
       </header>
 
+      {/* Admin navbar is simple, just shows the title */}
       <nav className="navbar">
         <ul>
-          <li><span>Student Welfare Grievances</span></li>
+          <li className="admin-nav-title">
+            <span>Student Welfare Grievances</span>
+          </li>
         </ul>
       </nav>
 
-      <section className="dashboard-body">
+      <main className="dashboard-body">
         <div className="card">
-          <h2>📋 Student Welfare Grievances</h2>
-          {message && <p style={{ color: "green" }}>{message}</p>}
+          <h2>Incoming Grievances</h2>
+          
+          {/* Professional Alert Box */}
+          {msg && <div className={`alert-box ${statusType}`}>{msg}</div>}
 
           {grievances.length === 0 ? (
-            <p>No grievances found for Student Welfare Department.</p>
+            <div className="empty-state">
+              <p>No grievances found for Student Welfare Department.</p>
+            </div>
           ) : (
-            <table className="grievance-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>School</th>
-                  <th>Message</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {grievances.map((g) => (
-                  <tr key={g._id}>
-                    <td>{g.name}</td>
-                    <td>{g.email}</td>
-                    <td>{g.school}</td>
-                    <td>{g.message}</td>
-                    <td>{g.status}</td>
-                    <td>
-                      {g.status !== "Resolved" ? (
-                        <button
-                          className="resolve-btn"
-                          onClick={() => updateStatus(g._id, "Resolved")}
-                        >
-                          Mark Resolved
-                        </button>
-                      ) : (
-                        <button className="resolved-btn" disabled>
-                          Resolved
-                        </button>
-                      )}
-                    </td>
+            <div className="table-container">
+              <table className="grievance-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>School</th>
+                    <th>Message</th>
+                    <th>Submitted At</th>
+                    <th>Status</th>
+                    <th>Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {grievances.map((g) => (
+                    <tr key={g._id}>
+                      <td>{g.name}</td>
+                      <td>{g.email}</td>
+                      <td>{g.school}</td>
+                      <td className="message-cell">{g.message}</td>
+                      <td>{formatDate(g.createdAt)}</td>
+                      <td>
+                        <span className={`status-badge status-${g.status.toLowerCase()}`}>
+                          {g.status}
+                        </span>
+                      </td>
+                      <td>
+                        {g.status !== "Resolved" ? (
+                          <button
+                            className="resolve-btn"
+                            onClick={() => updateStatus(g._id, "Resolved")}
+                          >
+                            Mark Resolved
+                          </button>
+                        ) : (
+                          <button className="resolved-btn" disabled>
+                            Resolved
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
-      </section>
+      </main>
 
       <button className="logout-floating" onClick={handleLogout}>
         Logout

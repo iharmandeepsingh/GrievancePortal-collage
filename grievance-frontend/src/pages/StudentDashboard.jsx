@@ -1,32 +1,48 @@
-// src/pages/StudentDashboard.jsx
 import React, { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import "../styles/Dashboard.css";
+import { useNavigate, Link, useLocation } from "react-router-dom";
+import "../styles/Dashboard.css"; // Uses the same professional Dashboard.css
 
 function StudentDashboard() {
   const navigate = useNavigate();
+  const location = useLocation(); // Get current URL
   const role = localStorage.getItem("grievance_role");
   const userId = localStorage.getItem("grievance_id");
 
-  const [activeSection, setActiveSection] = useState("student-welfare");
-  const [message, setMessage] = useState("");
-  const [color, setColor] = useState("red");
+  // Get category from URL path (e.g., "/student/accounts" -> "accounts")
+  const currentCategory = location.pathname.split("/").pop() || "welfare";
 
   const [formData, setFormData] = useState({
     name: "",
-    regid: "",
+    regid: userId || "", // ✅ Pre-fill from localStorage
     email: "",
     school: "",
     message: "",
   });
+
+  const [msg, setMsg] = useState(""); // Renamed for consistency
+  const [statusType, setStatusType] = useState(""); // Renamed for consistency
+  const [errors, setErrors] = useState({});
 
   // ✅ Route protection
   useEffect(() => {
     if (!role || role !== "student") navigate("/");
   }, [role, navigate]);
 
+  // ✅ Validation function
+  const validateField = (name, value) => {
+    let error = "";
+    if (!value) {
+      error = "This field is required";
+    } else if (name === "email" && !/\S+@\S+\.\S+/.test(value)) {
+      error = "Email address is invalid";
+    }
+    setErrors((prev) => ({ ...prev, [name]: error }));
+  };
+
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    validateField(name, value); // Validate on change
   };
 
   const handleLogout = () => {
@@ -34,10 +50,31 @@ function StudentDashboard() {
     navigate("/");
   };
 
-  // ✅ Dynamic form submit (based on section)
+  // ✅ Form validation check
+  const validateForm = () => {
+    const newErrors = {};
+    // Check all fields except regid (which is pre-filled)
+    const fieldsToValidate = ["name", "email", "school", "message"];
+    fieldsToValidate.forEach((key) => {
+      if (!formData[key]) {
+        newErrors[key] = "This field is required";
+      }
+    });
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // ✅ Updated form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage("Submitting your grievance...");
+    if (!validateForm()) {
+      setMsg("Please fill out all required fields.");
+      setStatusType("error");
+      return;
+    }
+
+    setMsg("Submitting your grievance...");
+    setStatusType("info");
 
     try {
       const res = await fetch("http://localhost:5000/api/grievances", {
@@ -46,133 +83,151 @@ function StudentDashboard() {
         body: JSON.stringify({
           userId,
           ...formData,
-          category: activeSection.replace("-", " "),
+          category: currentCategory, // ✅ Dynamic category from URL
         }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Submission failed");
 
-      setMessage("✅ Grievance submitted successfully!");
-      setColor("green");
+      setMsg("Grievance submitted successfully!");
+      setStatusType("success");
       setFormData({
+        ...formData, // Keep regid
         name: "",
-        regid: "",
         email: "",
         school: "",
         message: "",
       });
+      setErrors({});
     } catch (err) {
-      setMessage(`❌ ${err.message}`);
-      setColor("red");
+      setMsg(`Error: ${err.message}`);
+      setStatusType("error");
     }
   };
 
+  // Capitalize first letter for titles (e.g., "accounts" -> "Accounts")
+  const categoryTitle =
+    currentCategory.charAt(0).toUpperCase() + currentCategory.slice(1);
+
   return (
+    // Use dashboard-container to scope styles
     <div className="dashboard-container">
       <header className="dashboard-header">
-        <h1>🎓 Student Dashboard</h1>
+        <h1>Student Dashboard</h1>
+        <p>Welcome, {userId}</p>
       </header>
 
-      {/* ✅ NAVBAR (Links to other pages) */}
-    <nav className="navbar">
-  <ul>
+      {/* ✅ Smart Navbar */}
+      <nav className="navbar">
+        <ul>
+          <li className={currentCategory === "welfare" ? "active" : ""}>
+            <Link to="/student/welfare">Student Welfare</Link>
+          </li>
+          <li className={currentCategory === "admission" ? "active" : ""}>
+            <Link to="/student/admission">Admission</Link>
+          </li>
+          <li className={currentCategory === "accounts" ? "active" : ""}>
+            <Link to="/student/accounts">Accounts</Link>
+          </li>
+          <li className={currentCategory === "examination" ? "active" : ""}>
+            <Link to="/student/examination">Examination</Link>
+          </li>
+        </ul>
+      </nav>
 
-    <li><Link to="/student/welfare">Student Welfare</Link></li>
-    <li><Link to="/student/admission">Admission</Link></li>
-    <li><Link to="/student/accounts">Accounts</Link></li>
-    <li><Link to="/student/examination">Examination</Link></li>
-  </ul>
-</nav>
-
-
-      {/* ✅ MAIN GRIEVANCE FORM (for general submission) */}
-      <section className="dashboard-body">
+      {/* ✅ MAIN GRIEVANCE FORM */}
+      <main className="dashboard-body">
         <div className="card">
-          <h2>Submit a General Grievance</h2>
+          <h2>Submit {categoryTitle} Grievance</h2>
           <p>
-            You can submit a general grievance here, or choose a specific department
-            from the navigation bar above.
+            Please describe your issue in detail. This will be sent to the{" "}
+            <strong>{categoryTitle}</strong> department.
           </p>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
+            {/* ✅ Professional Alert Box */}
+            {msg && <div className={`alert-box ${statusType}`}>{msg}</div>}
+
             <div className="form-row">
-              <label>
-                Full Name
+              <div className="input-group">
+                <label>Full Name</label>
                 <input
                   type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
                   placeholder="John Doe"
-                  required
                 />
-              </label>
+                {errors.name && <p className="error-text">{errors.name}</p>}
+              </div>
 
-              <label>
-                Registration ID
+              <div className="input-group">
+                <label>Registration ID</label>
                 <input
                   type="text"
                   name="regid"
                   value={formData.regid}
-                  onChange={handleChange}
-                  placeholder="e.g., 22CSE1234"
-                  required
+                  readOnly
+                  disabled
+                  className="disabled-input" // Style from Dashboard.css
                 />
-              </label>
+              </div>
             </div>
 
             <div className="form-row">
-              <label>
-                Email
+              <div className="input-group">
+                <label>Email</label>
                 <input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="john@gmail.com"
-                  required
                 />
-              </label>
+                {errors.email && <p className="error-text">{errors.email}</p>}
+              </div>
 
-              <label>
-                School
+              <div className="input-group">
+                <label>School</label>
                 <select
                   name="school"
                   value={formData.school}
                   onChange={handleChange}
-                  required
                 >
                   <option value="">Select School</option>
-                  <option value="School of Engineering">School of Engineering</option>
+                  <option value="School of Engineering">
+                    School of Engineering
+                  </option>
                   <option value="School of Business">School of Business</option>
                   <option value="School of Sciences">School of Sciences</option>
                   <option value="School of Arts">School of Arts</option>
                   <option value="School of Law">School of Law</option>
                 </select>
-              </label>
+                {errors.school && <p className="error-text">{errors.school}</p>}
+              </div>
             </div>
 
-            <label>
-              Message / Query
+            <div className="input-group">
+              <label>Message / Query</label>
               <textarea
                 name="message"
                 value={formData.message}
                 onChange={handleChange}
                 placeholder="Describe your issue in detail..."
                 rows="5"
-                required
               ></textarea>
-            </label>
+              {errors.message && (
+                <p className="error-text">{errors.message}</p>
+              )}
+            </div>
 
             <button type="submit" className="submit-btn">
               Submit Grievance
             </button>
           </form>
-
-          <p style={{ color, marginTop: "10px" }}>{message}</p>
         </div>
-      </section>
+      </main>
 
       {/* ✅ Floating Logout Button */}
       <button className="logout-floating" onClick={handleLogout}>
